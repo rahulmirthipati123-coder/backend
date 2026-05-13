@@ -16,11 +16,10 @@ exports.sendOtp = async (req, res) => {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    if (isRegistration && !email) {
-      return res.status(400).json({ message: "Email is required for registration phone verification" });
-    }
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email ? email.trim() : null;
 
-    const userByPhone = await User.findOne({ phone });
+    const userByPhone = await User.findOne({ phone: trimmedPhone });
 
     if (isRegistration && userByPhone && userByPhone.username) {
       return res.status(400).json({ message: "Phone number is already registered" });
@@ -31,19 +30,23 @@ exports.sendOtp = async (req, res) => {
     }
 
     if (isRegistration) {
-      let user = await User.findOne({ email });
+      if (!trimmedEmail) {
+        return res.status(400).json({ message: "Email is required for registration phone verification" });
+      }
 
-      if (user && user.username && user.phone && user.phone !== phone) {
+      let user = await User.findOne({ email: trimmedEmail });
+
+      if (user && user.username && user.phone && user.phone !== trimmedPhone) {
         return res.status(400).json({ message: "This email is already associated with a different phone number" });
       }
 
       if (!user) {
-        user = new User({ email, phone, isVerified: false, phoneVerified: false });
+        user = new User({ email: trimmedEmail, phone: trimmedPhone, isVerified: false, phoneVerified: false });
       } else {
-        if (user.phone && user.phone !== phone) {
+        if (user.phone && user.phone !== trimmedPhone) {
           return res.status(400).json({ message: "This account already has a different phone number" });
         }
-        user.phone = phone;
+        user.phone = trimmedPhone;
       }
 
       await user.save();
@@ -51,7 +54,7 @@ exports.sendOtp = async (req, res) => {
 
     const verification = await client.verify.v2.services(verifyServiceSid)
       .verifications
-      .create({ to: phone, channel: "sms" });
+      .create({ to: trimmedPhone, channel: "sms" });
 
     res.status(200).json({
       success: true,
@@ -72,25 +75,29 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "Phone number and OTP are required" });
     }
 
+    const trimmedPhone = phone.trim();
+    const trimmedOtp = otp.toString().trim();
+    const trimmedEmail = email ? email.trim() : null;
+
     const verificationCheck = await client.verify.v2.services(verifyServiceSid)
       .verificationChecks
-      .create({ to: phone, code: otp });
+      .create({ to: trimmedPhone, code: trimmedOtp });
 
     if (verificationCheck.status !== "approved") {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
     if (isRegistration) {
-      if (!email) {
+      if (!trimmedEmail) {
         return res.status(400).json({ message: "Email is required for phone registration verification" });
       }
 
-      let user = await User.findOne({ email });
+      let user = await User.findOne({ email: trimmedEmail });
 
       if (!user) {
-        user = new User({ email, phone, isVerified: false, phoneVerified: true });
+        user = new User({ email: trimmedEmail, phone: trimmedPhone, isVerified: false, phoneVerified: true });
       } else {
-        user.phone = phone;
+        user.phone = trimmedPhone;
         user.phoneVerified = true;
       }
 
@@ -102,7 +109,7 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({ phone: trimmedPhone });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }

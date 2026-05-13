@@ -189,15 +189,17 @@ router.post(
         password,
       } = req.body;
 
+      const trimmedEmail = email ? email.trim() : "";
+
       // Find user
       const user =
         await User.findOne({
-          email,
+          email: trimmedEmail,
         });
 
       if (!user) {
-        return res.status(400).json({
-          msg:
+        return res.status(404).json({
+          message:
             "User not found",
         });
       }
@@ -210,8 +212,8 @@ router.post(
         );
 
       if (!isMatch) {
-        return res.status(400).json({
-          msg:
+        return res.status(401).json({
+          message:
             "Invalid password",
         });
       }

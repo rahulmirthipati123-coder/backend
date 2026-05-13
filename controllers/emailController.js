@@ -12,7 +12,8 @@ exports.sendOtp = async (req, res) => {
             return res.status(400).json({ message: "Email is required" });
         }
 
-        let user = await User.findOne({ email });
+        const trimmedEmail = email.trim();
+        let user = await User.findOne({ email: trimmedEmail });
 
         // For registration, allow sending OTP to new users
         if(!user && !isRegistration){
@@ -22,7 +23,7 @@ exports.sendOtp = async (req, res) => {
         // For registration, create a temporary user record for OTP storage
         if(!user && isRegistration){
             user = new User({
-                email,
+                email: trimmedEmail,
                 otp: null,
                 otpExpires: null,
                 // Temporary fields for registration
@@ -36,14 +37,22 @@ exports.sendOtp = async (req, res) => {
         user.otpExpires = Date.now() + 5 * 60 * 1000;
         await user.save();
 
-        await sendOTPEmail(email, otp);
+        // Add a timeout to the email sending to prevent hanging
+        const sendEmailPromise = sendOTPEmail(trimmedEmail, otp);
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Email service timeout")), 15000)
+        );
+
+        await Promise.race([sendEmailPromise, timeoutPromise]);
+
         res.status(200).json({
             success: true,
             message: "OTP sent to your email",
             });
 
     }catch(err){
-        res.status(500).json({ message: "Server error" });
+        console.error("Email send error:", err);
+        res.status(500).json({ message: err.message || "Server error" });
     }
 }
 
