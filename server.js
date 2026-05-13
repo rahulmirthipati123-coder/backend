@@ -13,6 +13,7 @@ const app = express();
 // CORS configuration for production
 const corsOptions = {
   origin: [
+    'https://frontend-olive-gamma-30.vercel.app',
     'https://frontend-ai1cdrd8g-rahul-s-projects11.vercel.app',
     'http://localhost:5173', // For local development
     'http://localhost:3000'  // Alternative local port
